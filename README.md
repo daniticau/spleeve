@@ -1,73 +1,42 @@
-# React + TypeScript + Vite
+# Spleeve
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Tag, normalize, and export your MP3s for Spotify local files. Everything runs in the browser.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Metadata editing** — title, artist(s), album, cover art
+- **Cover art search** — search iTunes and apply hi-res (600x600) artwork
+- **Auto-fill** — parse artist/title from filename, then match against iTunes for album + artwork
+- **Volume normalization** — measures loudness (ITU-R BS.1770 LUFS) and writes ReplayGain tags targeting Spotify's -14 LUFS
+- **Batch processing** — drop multiple files, each gets its own editor card
+- **Folder output** — pick a save folder once via File System Access API; it persists across sessions
+- **YouTube download** — paste a URL to download and tag (requires local `yt-dlp` + `ffmpeg`)
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open http://localhost:5173 and drop your MP3s.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Tech Stack
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Vite 8 + React 19 + TypeScript
+- Tailwind CSS v4 + shadcn/ui
+- `music-metadata` + `browser-id3-writer` for ID3 tag read/write
+- Web Audio API for LUFS measurement
+
+## How It Works
+
+1. Drop MP3 files (or paste a YouTube URL)
+2. Edit metadata — or hit auto-fill to pull from filename + iTunes
+3. Toggle per-file volume normalization
+4. Hit **Save All** to write tagged MP3s to your chosen folder (or download)
+
+All ID3 tags are written as v2.3 (what Spotify reads). Cover art is resized to 600x600 JPEG. ReplayGain tags (`REPLAYGAIN_TRACK_GAIN`, `REPLAYGAIN_TRACK_PEAK`) are written as TXXX frames.
+
+## YouTube Downloads
+
+Requires `yt-dlp` and `ffmpeg` on your PATH. The dev server exposes `/api/youtube` which handles the download server-side.

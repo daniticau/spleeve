@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets
+.env
+.env.*
+*.pem
+
+# Claude
+.claude/
+
+# Font sampler (dev utility)
+font-sampler.html
