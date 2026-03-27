@@ -1,12 +1,12 @@
-# CLAUDE.md — Spleeve
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What This Is
-Spleeve is a browser-based tool that prepares MP3s for Spotify local files — tag metadata (title, artist, album, cover art), normalize volume via ReplayGain, and export. All processing happens client-side except YouTube downloads.
+Spleeve is a browser-based tool that prepares MP3s for Spotify local files — tag metadata (title, artist, album, cover art), normalize volume via ReplayGain, crop audio, and export. All processing happens client-side except YouTube downloads.
 
 ## Commands
-- `pnpm dev` — start dev server (includes YouTube download API via Vite middleware)
+- `pnpm dev` — start Vite dev server at localhost:5173
 - `pnpm build` — type-check (`tsc -b`) + production build
 - `pnpm lint` — ESLint
 - `pnpm preview` — preview production build
@@ -15,7 +15,7 @@ Spleeve is a browser-based tool that prepares MP3s for Spotify local files — t
 - Vite 8 + React 19 + TypeScript (strict) + pnpm
 - Tailwind CSS v4 + shadcn/ui (dark theme, Geist font)
 - `music-metadata` (read ID3) + `browser-id3-writer` (write ID3v2.3)
-- Web Audio API for LUFS measurement (ITU-R BS.1770)
+- Web Audio API for LUFS measurement (ITU-R BS.1770) and waveform extraction
 - iTunes Search API for cover art + metadata lookup
 - Path alias: `@/` → `src/`
 
@@ -23,29 +23,38 @@ Spleeve is a browser-based tool that prepares MP3s for Spotify local files — t
 
 ### UI Layout
 - **Empty state**: centered dropzone
-- **With files**: stacked card per file (no sidebar/tabs), each card contains cover art, metadata fields, normalization toggle + LUFS readout, search/auto-fill actions, and a remove button
+- **With files**: stacked card per file (no sidebar/tabs), each card contains cover art, metadata fields, waveform editor with trim handles, normalization toggle + LUFS readout, search/auto-fill actions, and a remove button
 - **Bottom bar**: persistent save bar with folder picker + Save/Download All button
 
 ### Data Flow
 1. **Input**: User drops MP3s (or pastes YouTube URL → server-side yt-dlp download)
-2. **Read**: `metadata-reader.ts` extracts ID3 tags via `music-metadata`; `lufs-meter.ts` measures loudness via Web Audio API
-3. **Edit**: User modifies tags in UI; can auto-fill from filename parsing + iTunes search
-4. **Write**: `metadata-writer.ts` rebuilds all ID3v2.3 tags via `browser-id3-writer` (destructive write — all fields must be written back every time)
+2. **Read**: `metadata/reader.ts` extracts ID3 tags via `music-metadata`; `audio/lufs-meter.ts` measures loudness; `audio/decode.ts` + `audio/waveform.ts` produce waveform data for the editor
+3. **Edit**: User modifies tags in UI; can auto-fill from filename parsing + iTunes search; can crop audio via waveform trim handles
+4. **Write**: On save, `audio/mp3-trimmer.ts` does lossless frame-level slicing if trimmed, then `metadata/writer.ts` rebuilds all ID3v2.3 tags via `browser-id3-writer` (destructive write — all fields must be written back every time)
 5. **Output**: Save to File System Access API folder or browser download
 
 ### State Management
-- `useReducer` in `App.tsx` with a `Map<string, FileEntry>` — see `file-store.ts` for the reducer
-- Each `FileEntry` tracks: file, metadata, loudness, normalization toggle, save status
+- `useReducer` in `App.tsx` with a `Map<string, FileEntry>` — see `lib/store/file-store.ts` for the reducer and all action types
+- Each `FileEntry` tracks: file, metadata, loudness, normalization toggle, audio buffer, waveform data, trim bounds, save status
 - No external state library — all orchestration in App.tsx
 - Per-file normalization: each entry has its own `normalizeEnabled` flag
+- LUFS measurement is triggered by an effect in App.tsx that watches for ready files without loudness data
+
+### Audio Processing Pipeline
+- `audio/decode.ts` — decodes MP3 → AudioBuffer via Web Audio API (shared for waveform, playback, and LUFS)
+- `audio/waveform.ts` — downsamples AudioBuffer to peak values for canvas rendering
+- `audio/lufs-meter.ts` — ITU-R BS.1770 integrated loudness + true peak measurement
+- `audio/replaygain.ts` — computes ReplayGain values from LUFS measurement (targets -14 LUFS)
+- `audio/mp3-trimmer.ts` — parses raw MP3 frame boundaries and slices at frame edges (lossless, no re-encoding); strips Xing/VBRI info frames; output is raw frames (ID3 tags are re-added by the writer)
 
 ### YouTube Pipeline
 - Client: `src/lib/youtube.ts` — validates URL, POSTs to `/api/youtube`, receives MP3 blob + metadata in response headers
-- Server: `server/youtube.ts` — Vite dev middleware that shells out to local `yt-dlp` + `ffmpeg`, single-download mutex (429 if busy)
+- Server: `server/youtube.ts` — exports a Vite Connect middleware that shells out to local `yt-dlp` + `ffmpeg`, single-download mutex (429 if busy)
+- **Note**: the middleware is exported but not currently wired into `vite.config.ts` — needs a `configureServer` plugin to activate
 - Requires `yt-dlp` and `ffmpeg` installed locally
 
 ### Output Folder Persistence
-`folder-store.ts` persists the user's chosen output directory handle in IndexedDB so it survives page reloads. Uses File System Access API (`showDirectoryPicker`).
+`lib/store/folder-store.ts` persists the user's chosen output directory handle in IndexedDB so it survives page reloads. Uses File System Access API (`showDirectoryPicker`).
 
 ## Key Technical Constraints
 - `browser-id3-writer` **removes ALL existing tags** before writing — always write all fields back
@@ -55,3 +64,4 @@ Spleeve is a browser-based tool that prepares MP3s for Spotify local files — t
 - Spotify LUFS targets: -14 (Normal), -11 (Loud), -19 (Quiet); app targets -14
 - iTunes cover art URLs: replace `100x100bb.jpg` with `600x600bb.jpg` for hi-res
 - LUFS meter implements K-weighting (high-shelf + RLB high-pass biquad) with 400ms blocks, 75% overlap, absolute (-70 LUFS) and relative (-10 LU) gating
+- MP3 trimming is lossless — operates on frame boundaries, not sample-level. Trim accuracy is limited to frame duration (~26ms for 44.1kHz Layer III). The trimmer strips the ID3v2 header and any Xing/VBRI VBR info frame; the metadata writer adds fresh tags after trimming
