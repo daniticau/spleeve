@@ -5,9 +5,12 @@ import { MetadataEditor } from '@/components/metadata-editor';
 import { Button } from '@/components/ui/button';
 import { readMetadata, type TrackMetadata } from '@/lib/metadata/reader';
 import { writeMetadata } from '@/lib/metadata/writer';
-import { measureLoudness } from '@/lib/audio/lufs-meter';
+import { measureLoudness, measureLoudnessFromBuffer } from '@/lib/audio/lufs-meter';
+import { decodeAudioBuffer } from '@/lib/audio/decode';
+import { extractWaveform } from '@/lib/audio/waveform';
 import { calculateReplayGain } from '@/lib/audio/replaygain';
 import { resizeToSquare } from '@/lib/image-utils';
+import { trimMp3 } from '@/lib/audio/mp3-trimmer';
 import { downloadBlob, saveToFolder } from '@/lib/download';
 import { saveFolder, loadFolder } from '@/lib/store/folder-store';
 import { parseFilename } from '@/lib/metadata/filename-parser';
@@ -72,6 +75,15 @@ function App() {
           const buffer = await file.arrayBuffer();
           const metadata = await readMetadata(file);
           dispatch({ type: 'FILE_LOADED', id, buffer, metadata });
+
+          // Decode AudioBuffer for waveform + playback + LUFS
+          try {
+            const audioBuffer = await decodeAudioBuffer(buffer);
+            const waveform = extractWaveform(audioBuffer);
+            dispatch({ type: 'SET_AUDIO_BUFFER', id, audioBuffer, waveform });
+          } catch (decodeErr) {
+            console.error('Audio decode failed:', decodeErr);
+          }
         } catch (err) {
           dispatch({ type: 'FILE_LOAD_ERROR', id });
           showToast(`Failed to read ${file.name}`);
@@ -95,7 +107,10 @@ function App() {
       measuringIds.current.add(id);
 
       dispatch({ type: 'SET_MEASURING_LOUDNESS', id, measuring: true });
-      measureLoudness(entry.file)
+      const loudnessPromise = entry.audioBuffer
+        ? Promise.resolve(measureLoudnessFromBuffer(entry.audioBuffer))
+        : measureLoudness(entry.file);
+      loudnessPromise
         .then((result) => {
           dispatch({ type: 'SET_LOUDNESS', id, loudness: result });
         })
@@ -225,8 +240,16 @@ function App() {
           ? calculateReplayGain(loudness)
           : undefined;
 
+      // Apply trim if user has cropped the audio
+      const isTrimmed =
+        entry.trimStart > 0 ||
+        (entry.waveform && entry.trimEnd < entry.waveform.duration);
+      const bufferToWrite = isTrimmed
+        ? trimMp3(originalBuffer, entry.trimStart, entry.trimEnd)
+        : originalBuffer;
+
       const blob = writeMetadata(
-        originalBuffer,
+        bufferToWrite,
         metadata,
         replayGain ? { gain: replayGain.gain, peak: replayGain.peak } : undefined,
       );
@@ -259,6 +282,10 @@ function App() {
     }
   }, [files, dirHandle, folderName, showToast]);
 
+  const handleTrimChange = useCallback((id: string, trimStart: number, trimEnd: number) => {
+    dispatch({ type: 'SET_TRIM', id, trimStart, trimEnd });
+  }, []);
+
   const handleRemove = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_FILE', id });
   }, []);
@@ -272,7 +299,7 @@ function App() {
           Spleeve
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Tag, normalize, and export your MP3s for Spotify
+          Tag, normalize, and export your MP3(s) for Spotify
         </p>
       </header>
 
@@ -333,6 +360,11 @@ function App() {
                     loudness={entry.loudness}
                     measuring={entry.measuringLoudness}
                     loudnessError={entry.loudnessError}
+                    waveform={entry.waveform}
+                    audioBuffer={entry.audioBuffer}
+                    trimStart={entry.trimStart}
+                    trimEnd={entry.trimEnd}
+                    onTrimChange={(s, e) => handleTrimChange(entry.id, s, e)}
                   />
                 );
               }
@@ -342,7 +374,7 @@ function App() {
           </div>
 
           {/* Global save bar */}
-          <div className="mt-8 flex items-stretch gap-3 border-t border-white/[0.06] pt-6">
+          <div className="mt-8 flex items-stretch gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-card/60 px-4 ring-1 ring-white/[0.06]">
               {folderName ? (
                 <>

@@ -79,7 +79,7 @@ export function FileDropzone({ onFiles, hasFiles }: FileDropzoneProps) {
             <div className="absolute inset-0 rounded-xl bg-primary/5 blur-xl" />
           </div>
           <p className="text-sm font-medium text-foreground">
-            Drop your MP3s here
+            Drop your MP3(s) here
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             or click to browse

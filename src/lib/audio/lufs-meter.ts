@@ -24,6 +24,13 @@ export async function measureLoudness(file: File): Promise<LoudnessResult> {
   }
 }
 
+/**
+ * Measure loudness directly from a decoded AudioBuffer (avoids redundant decode).
+ */
+export function measureLoudnessFromBuffer(audioBuffer: AudioBuffer): LoudnessResult {
+  return analyzeLoudness(audioBuffer);
+}
+
 function analyzeLoudness(buffer: AudioBuffer): LoudnessResult {
   const sampleRate = buffer.sampleRate;
   const numChannels = buffer.numberOfChannels;

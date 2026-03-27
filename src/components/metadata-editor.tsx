@@ -6,8 +6,10 @@ import { Switch } from '@/components/ui/switch';
 import { TagInput } from '@/components/ui/tag-input';
 import { Spinner } from '@/components/ui/spinner';
 import { CoverArtPicker } from '@/components/cover-art-picker';
+import { WaveformEditor } from '@/components/waveform-editor';
 import type { TrackMetadata } from '@/lib/metadata/reader';
 import type { LoudnessResult } from '@/lib/audio/lufs-meter';
+import type { WaveformData } from '@/lib/audio/waveform';
 import { calculateReplayGain } from '@/lib/audio/replaygain';
 
 interface MetadataEditorProps {
@@ -25,6 +27,11 @@ interface MetadataEditorProps {
   loudness: LoudnessResult | null;
   measuring: boolean;
   loudnessError?: boolean;
+  waveform: WaveformData | null;
+  audioBuffer: AudioBuffer | null;
+  trimStart: number;
+  trimEnd: number;
+  onTrimChange: (start: number, end: number) => void;
 }
 
 export function MetadataEditor({
@@ -42,6 +49,11 @@ export function MetadataEditor({
   loudness,
   measuring,
   loudnessError,
+  waveform,
+  audioBuffer,
+  trimStart,
+  trimEnd,
+  onTrimChange,
 }: MetadataEditorProps) {
   const replayGain = useMemo(
     () => loudness ? calculateReplayGain(loudness) : null,
@@ -102,8 +114,8 @@ export function MetadataEditor({
             />
           </div>
 
-          {/* Action row: auto-fill + normalization — aligned with search button */}
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+          {/* Auto-fill button — right under album */}
+          <div className="mt-2 text-xs text-muted-foreground">
             <button
               onClick={onAutoFill}
               disabled={autoFilling}
@@ -116,8 +128,22 @@ export function MetadataEditor({
               )}
               {autoFilling ? 'Auto-filling...' : 'Auto-fill from filename'}
             </button>
+          </div>
+        </div>
+      </div>
 
-            <div className="ml-auto flex items-center gap-3">
+      {/* Waveform + trim + playback */}
+      {waveform && (
+        <div className="mt-4">
+          <WaveformEditor
+            waveform={waveform}
+            audioBuffer={audioBuffer}
+            trimStart={trimStart}
+            trimEnd={trimEnd}
+            onTrimChange={onTrimChange}
+          >
+            {/* Normalize info — rendered inline with timer row */}
+            <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
               {measuring ? (
                 <div className="flex items-center gap-1.5">
                   <Spinner className="h-3 w-3" />
@@ -143,9 +169,9 @@ export function MetadataEditor({
                 <Label className="text-xs text-muted-foreground">Normalize</Label>
               </div>
             </div>
-          </div>
+          </WaveformEditor>
         </div>
-      </div>
+      )}
     </div>
   );
 }

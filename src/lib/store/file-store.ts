@@ -1,5 +1,6 @@
 import type { TrackMetadata } from '../metadata/reader';
 import type { LoudnessResult } from '../audio/lufs-meter';
+import type { WaveformData } from '../audio/waveform';
 
 export type FileEntryStatus = 'loading' | 'ready' | 'error';
 
@@ -16,6 +17,10 @@ export interface FileEntry {
   autoFilling: boolean;
   saved: boolean;
   normalizeEnabled: boolean;
+  audioBuffer: AudioBuffer | null;
+  waveform: WaveformData | null;
+  trimStart: number;
+  trimEnd: number;
 }
 
 export type FilesState = Map<string, FileEntry>;
@@ -31,7 +36,9 @@ export type FilesAction =
   | { type: 'SET_LOUDNESS_ERROR'; id: string }
   | { type: 'SET_AUTO_FILLING'; id: string; filling: boolean }
   | { type: 'MARK_SAVED'; id: string }
-  | { type: 'SET_NORMALIZE'; id: string; enabled: boolean };
+  | { type: 'SET_NORMALIZE'; id: string; enabled: boolean }
+  | { type: 'SET_AUDIO_BUFFER'; id: string; audioBuffer: AudioBuffer; waveform: WaveformData }
+  | { type: 'SET_TRIM'; id: string; trimStart: number; trimEnd: number };
 
 function updateEntry(state: FilesState, id: string, patch: Partial<FileEntry>): FilesState {
   const entry = state.get(id);
@@ -59,6 +66,10 @@ export function filesReducer(state: FilesState, action: FilesAction): FilesState
           autoFilling: false,
           saved: false,
           normalizeEnabled: true,
+          audioBuffer: null,
+          waveform: null,
+          trimStart: 0,
+          trimEnd: 0,
         });
       }
       return next;
@@ -98,6 +109,18 @@ export function filesReducer(state: FilesState, action: FilesAction): FilesState
       return updateEntry(state, action.id, { saved: true });
     case 'SET_NORMALIZE':
       return updateEntry(state, action.id, { normalizeEnabled: action.enabled });
+    case 'SET_AUDIO_BUFFER':
+      return updateEntry(state, action.id, {
+        audioBuffer: action.audioBuffer,
+        waveform: action.waveform,
+        trimEnd: action.waveform.duration,
+      });
+    case 'SET_TRIM':
+      return updateEntry(state, action.id, {
+        trimStart: action.trimStart,
+        trimEnd: action.trimEnd,
+        saved: false,
+      });
     default:
       return state;
   }
@@ -106,7 +129,11 @@ export function filesReducer(state: FilesState, action: FilesAction): FilesState
 export function isEdited(entry: FileEntry): boolean {
   if (!entry.metadata || !entry.initialMetadata) return false;
   const { metadata: m, initialMetadata: i } = entry;
+  const isTrimmed =
+    entry.trimStart > 0 ||
+    (entry.waveform !== null && entry.trimEnd < entry.waveform.duration);
   return (
+    isTrimmed ||
     m.title !== i.title ||
     m.album !== i.album ||
     m.artists.join('\0') !== i.artists.join('\0') ||
