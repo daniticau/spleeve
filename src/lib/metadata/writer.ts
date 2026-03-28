@@ -17,7 +17,7 @@ export function writeMetadata(
     writer.setFrame('TIT2', metadata.title);
   }
   if (metadata.artists.length > 0) {
-    writer.setFrame('TPE1', metadata.artists);
+    writer.setFrame('TPE1', [metadata.artists.join(', ')]);
     writer.setFrame('TPE2', metadata.artists[0]);
   }
   if (metadata.album) {

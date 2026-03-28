@@ -6,6 +6,8 @@ export interface TrackMetadata {
   album: string;
   coverArt: ArrayBuffer | null;
   coverArtMime: string | null;
+  /** Source bitrate in bps (e.g. 320000), null if unknown */
+  bitrate: number | null;
 }
 
 export async function readMetadata(file: File): Promise<TrackMetadata> {
@@ -34,5 +36,6 @@ export async function readMetadata(file: File): Promise<TrackMetadata> {
     album: common.album ?? '',
     coverArt,
     coverArtMime,
+    bitrate: metadata.format.bitrate ?? null,
   };
 }

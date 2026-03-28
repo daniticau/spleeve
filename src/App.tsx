@@ -11,6 +11,8 @@ import { extractWaveform } from '@/lib/audio/waveform';
 import { calculateReplayGain } from '@/lib/audio/replaygain';
 import { resizeToSquare } from '@/lib/image-utils';
 import { trimMp3 } from '@/lib/audio/mp3-trimmer';
+import { applyGain } from '@/lib/audio/normalizer';
+import { encodeMp3 } from '@/lib/audio/mp3-encoder';
 import { downloadBlob, saveToFolder } from '@/lib/download';
 import { saveFolder, loadFolder } from '@/lib/store/folder-store';
 import { parseFilename } from '@/lib/metadata/filename-parser';
@@ -244,9 +246,17 @@ function App() {
       const isTrimmed =
         entry.trimStart > 0 ||
         (entry.waveform && entry.trimEnd < entry.waveform.duration);
-      const bufferToWrite = isTrimmed
+      let bufferToWrite = isTrimmed
         ? trimMp3(originalBuffer, entry.trimStart, entry.trimEnd)
         : originalBuffer;
+
+      // Apply actual audio normalization (decode → gain → re-encode)
+      if (replayGain) {
+        const decoded = await decodeAudioBuffer(bufferToWrite);
+        const normalized = applyGain(decoded, replayGain.gainDb);
+        const bitrate = Math.round((metadata.bitrate ?? 320_000) / 1000);
+        bufferToWrite = encodeMp3(normalized, Math.min(bitrate, 320));
+      }
 
       const blob = writeMetadata(
         bufferToWrite,
@@ -342,7 +352,7 @@ function App() {
               }
 
               if (entry.status === 'ready' && entry.metadata) {
-                const searchQuery = `${entry.metadata.artists[0] ?? ''} ${entry.metadata.title}`.trim();
+                const searchQuery = entry.metadata.album || entry.metadata.artists[0] || '';
                 return (
                   <MetadataEditor
                     key={entry.id}
