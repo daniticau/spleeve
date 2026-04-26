@@ -1,12 +1,6 @@
 {
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
-  "routes": [
-    {
-      "src": "/privacy(?:/.*)?",
-      "status": 404
-    }
-  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
