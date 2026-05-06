@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo, useReducer } from 'react';
-import { X, Loader2, Download } from 'lucide-react';
+import { X, Loader2, Download, Folder, ChevronRight, Moon, Sun } from 'lucide-react';
 import { FileDropzone } from '@/components/file-dropzone';
 import { MetadataEditor } from '@/components/metadata-editor';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,10 @@ import { filesReducer, generateFileId, type FilesState } from '@/lib/store/file-
 
 function App() {
   const [files, dispatch] = useReducer(filesReducer, new Map() as FilesState);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    localStorage.getItem('theme') === 'dark' ? 'dark' : 'light',
+  );
+  const [themeSpinning, setThemeSpinning] = useState(false);
 
   // Output folder state (global)
   const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
@@ -39,6 +43,17 @@ function App() {
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('theme', theme);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.classList.remove('no-transition');
+      });
+    });
+  }, [theme]);
 
   // Derived state
   const fileEntries = useMemo(() => [...files.values()], [files]);
@@ -76,6 +91,12 @@ function App() {
         try {
           const buffer = await file.arrayBuffer();
           const metadata = await readMetadata(file);
+          if (!metadata.title && metadata.artists.length === 0) {
+            const parsed = parseFilename(file.name);
+            if (parsed?.title) metadata.title = parsed.title;
+            if (parsed?.artist) metadata.artists = [parsed.artist];
+            if (parsed?.trackNumber) metadata.trackNumber = parsed.trackNumber;
+          }
           dispatch({ type: 'FILE_LOADED', id, buffer, metadata });
 
           // Decode AudioBuffer for waveform + playback + LUFS
@@ -94,6 +115,27 @@ function App() {
       })
     );
   }, [showToast]);
+
+  const demoLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (demoLoadedRef.current) return;
+    if (!new URLSearchParams(window.location.search).has('demo')) return;
+    demoLoadedRef.current = true;
+
+    fetch('/demo-track.mp3')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Demo track missing');
+        const blob = await response.blob();
+        await handleFiles([
+          new File([blob], 'Spleeve Demo - Local File Test.mp3', { type: 'audio/mpeg' }),
+        ]);
+      })
+      .catch((err) => {
+        console.error(err);
+        showToast('Could not load demo track');
+      });
+  }, [handleFiles, showToast]);
 
   // Track which file IDs have LUFS measurement in flight
   const measuringIds = useRef(new Set<string>());
@@ -164,6 +206,7 @@ function App() {
     const updates: Partial<TrackMetadata> = {};
     if (parsed.title) updates.title = parsed.title;
     if (parsed.artist) updates.artists = [parsed.artist];
+    if (parsed.trackNumber) updates.trackNumber = parsed.trackNumber;
 
     dispatch({
       type: 'UPDATE_METADATA',
@@ -185,6 +228,7 @@ function App() {
         const itunesUpdates: Partial<TrackMetadata> = {};
         if (parsed.title) itunesUpdates.title = parsed.title;
         if (parsed.artist) itunesUpdates.artists = [parsed.artist];
+        if (parsed.trackNumber) itunesUpdates.trackNumber = parsed.trackNumber;
         if (best.album) itunesUpdates.album = best.album;
 
         try {
@@ -292,6 +336,56 @@ function App() {
     }
   }, [files, dirHandle, folderName, showToast]);
 
+  const handleSaveOne = useCallback(async (id: string) => {
+    const entry = files.get(id);
+    if (entry?.status !== 'ready' || !entry.metadata || !entry.originalBuffer) return;
+
+    const { metadata, originalBuffer, loudness } = entry;
+    const replayGain =
+      entry.normalizeEnabled && loudness
+        ? calculateReplayGain(loudness)
+        : undefined;
+
+    const isTrimmed =
+      entry.trimStart > 0 ||
+      (entry.waveform && entry.trimEnd < entry.waveform.duration);
+    let bufferToWrite = isTrimmed
+      ? trimMp3(originalBuffer, entry.trimStart, entry.trimEnd)
+      : originalBuffer;
+
+    if (replayGain) {
+      const decoded = await decodeAudioBuffer(bufferToWrite);
+      const normalized = applyGain(decoded, replayGain.gainDb);
+      const bitrate = Math.round((metadata.bitrate ?? 320_000) / 1000);
+      bufferToWrite = encodeMp3(normalized, Math.min(bitrate, 320));
+    }
+
+    const blob = writeMetadata(
+      bufferToWrite,
+      metadata,
+      replayGain ? { gain: replayGain.gain, peak: replayGain.peak } : undefined,
+    );
+
+    const artist = metadata.artists[0] || 'Unknown Artist';
+    const title = metadata.title || 'Unknown Title';
+    const filename = `${artist} - ${title}.mp3`;
+
+    if (dirHandle) {
+      try {
+        await saveToFolder(dirHandle, blob, filename);
+        showToast(`Saved ${filename} to ${folderName}`);
+      } catch {
+        downloadBlob(blob, filename);
+        showToast('Folder access lost — downloaded instead.');
+      }
+    } else {
+      downloadBlob(blob, filename);
+      showToast(`Downloaded ${filename}`);
+    }
+
+    dispatch({ type: 'MARK_SAVED', id });
+  }, [files, dirHandle, folderName, showToast]);
+
   const handleTrimChange = useCallback((id: string, trimStart: number, trimEnd: number) => {
     dispatch({ type: 'SET_TRIM', id, trimStart, trimEnd });
   }, []);
@@ -300,27 +394,53 @@ function App() {
     dispatch({ type: 'REMOVE_FILE', id });
   }, []);
 
+  const handleThemeToggle = useCallback(() => {
+    document.documentElement.classList.add('no-transition');
+    setTheme((current) => current === 'dark' ? 'light' : 'dark');
+    setThemeSpinning(false);
+    requestAnimationFrame(() => setThemeSpinning(true));
+  }, []);
+
   const hasFiles = files.size > 0;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-4 py-8 pb-24 lg:px-6">
-      <header className="mb-8 text-center">
-        <h1 className="font-mono text-xl font-semibold tracking-tight text-foreground">
-          Spleeve
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Tag, normalize, and export your MP3(s) for Spotify
-        </p>
+    <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col overflow-x-hidden px-4 py-5 pb-32 sm:px-6 lg:px-8">
+      <header className="mb-5 flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">
+            Your tracks
+          </h1>
+          <p className="mt-1 break-words text-sm text-muted-foreground">
+            Edit artwork, metadata, crop, loudness, and export Spotify-ready MP3s.
+          </p>
+        </div>
+        <button
+          type="button"
+          id="theme-toggle"
+          className={`theme-toolbar-btn shrink-0 ${themeSpinning ? 'spinning' : ''}`}
+          aria-label="Toggle dark mode"
+          onClick={handleThemeToggle}
+          onAnimationEnd={() => setThemeSpinning(false)}
+        >
+          <span className="theme-icon-sun">
+            <Sun strokeWidth={1.5} />
+          </span>
+          <span className="theme-icon-moon">
+            <Moon strokeWidth={1.5} />
+          </span>
+        </button>
       </header>
 
       {!hasFiles ? (
-        <div className="mx-auto w-full max-w-lg">
-          <FileDropzone onFiles={handleFiles} hasFiles={false} />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full sm:max-w-lg" style={{ maxWidth: 'min(32rem, calc(100vw - 2rem))' }}>
+            <FileDropzone onFiles={handleFiles} hasFiles={false} />
+          </div>
         </div>
       ) : (
         <>
           {/* Top bar: dropzone */}
-          <div className="mb-6">
+          <div className="mb-5">
             <FileDropzone onFiles={handleFiles} hasFiles={true} />
           </div>
 
@@ -329,16 +449,22 @@ function App() {
             {fileEntries.map(entry => {
               if (entry.status === 'loading') {
                 return (
-                  <div key={entry.id} className="flex flex-col items-center justify-center gap-3 rounded-xl bg-card/60 py-16 ring-1 ring-white/[0.06]">
+                  <div
+                    key={entry.id}
+                    className="flex min-w-0 flex-col items-center justify-center gap-3 rounded-2xl bg-card py-16 shadow-sm"
+                    style={{ maxWidth: 'calc(100vw - 2rem)' }}
+                  >
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Reading {entry.file.name}...</p>
+                    <p className="max-w-full truncate px-4 text-sm text-muted-foreground">
+                      Reading {entry.file.name}...
+                    </p>
                   </div>
                 );
               }
 
               if (entry.status === 'error') {
                 return (
-                  <div key={entry.id} className="flex items-center justify-between gap-4 rounded-xl bg-destructive/5 px-5 py-6 ring-1 ring-destructive/20">
+                  <div key={entry.id} className="flex items-center justify-between gap-4 rounded-2xl bg-card px-5 py-6 text-destructive shadow-sm">
                     <p className="text-sm text-destructive">Failed to read {entry.file.name}</p>
                     <button
                       type="button"
@@ -365,6 +491,7 @@ function App() {
                     autoFilling={entry.autoFilling}
                     fileName={entry.file.name}
                     onRemove={() => handleRemove(entry.id)}
+                    onSave={() => handleSaveOne(entry.id)}
                     normalizeEnabled={entry.normalizeEnabled}
                     onNormalizeChange={(enabled) => dispatch({ type: 'SET_NORMALIZE', id: entry.id, enabled })}
                     loudness={entry.loudness}
@@ -384,47 +511,51 @@ function App() {
           </div>
 
           {/* Global save bar */}
-          <div className="mt-8 flex items-stretch gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-card/60 px-4 ring-1 ring-white/[0.06]">
-              {folderName ? (
-                <>
-                  <span className="shrink-0 text-sm text-muted-foreground">Save to</span>
-                  <span className="flex-1 truncate rounded-md bg-black/20 px-2.5 py-1 font-mono text-sm text-foreground">
-                    {folderName}
-                  </span>
-                  <Button variant="outline" size="sm" onClick={handlePickFolder}>
-                    Change
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="flex-1 text-sm text-muted-foreground">
-                    No save folder — files will download normally
-                  </span>
-                  <Button variant="outline" size="sm" onClick={handlePickFolder}>
-                    Choose folder
-                  </Button>
-                </>
-              )}
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/70 bg-background/92 px-4 py-3 backdrop-blur-xl sm:px-6">
+            <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-stretch">
+              <div className="flex min-w-0 flex-1 flex-col items-start gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm sm:min-h-14 sm:flex-row sm:items-center sm:py-0">
+                <Folder className="size-5 shrink-0 text-primary" />
+                {folderName ? (
+                  <>
+                    <span className="shrink-0 text-sm text-muted-foreground">Save to</span>
+                    <span className="flex-1 truncate text-sm font-medium text-foreground">
+                      {folderName}
+                    </span>
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handlePickFolder}>
+                      Change
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="min-w-0 text-sm text-muted-foreground sm:flex-1">
+                      No save folder — files will download normally
+                    </span>
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handlePickFolder}>
+                      Choose folder
+                    </Button>
+                  </>
+                )}
+              </div>
+              <Button
+                onClick={handleSaveAll}
+                className="h-14 w-full shrink-0 rounded-2xl bg-primary px-5 text-sm shadow-lg shadow-primary/20 sm:w-auto sm:px-8"
+                disabled={readyCount === 0}
+              >
+                <Download className="h-4 w-4" />
+                {dirHandle
+                  ? `Save All (${readyCount})`
+                  : `Download All (${readyCount})`
+                }
+                <ChevronRight className="h-4 w-4 opacity-70" />
+              </Button>
             </div>
-            <Button
-              onClick={handleSaveAll}
-              className="h-14 shrink-0 px-8 text-sm"
-              disabled={readyCount === 0}
-            >
-              <Download className="h-4 w-4" />
-              {dirHandle
-                ? `Save All (${readyCount})`
-                : `Download All (${readyCount})`
-              }
-            </Button>
           </div>
         </>
       )}
 
       {/* Toast */}
       {toast && (
-        <div className="animate-in slide-in-from-bottom-4 fade-in duration-200 fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-card px-4 py-3 text-sm text-foreground shadow-xl shadow-black/20 ring-1 ring-white/[0.08]">
+        <div className="animate-in slide-in-from-bottom-4 fade-in fixed bottom-24 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-card px-4 py-3 text-sm text-foreground shadow-xl duration-200">
           <span>{toast}</span>
           <button
             onClick={() => {

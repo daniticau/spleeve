@@ -4,6 +4,10 @@ export interface TrackMetadata {
   title: string;
   artists: string[];
   album: string;
+  trackNumber: string;
+  year: string;
+  genre: string;
+  contentRating: 'unspecified' | 'clean' | 'explicit';
   coverArt: ArrayBuffer | null;
   coverArtMime: string | null;
   /** Source bitrate in bps (e.g. 320000), null if unknown */
@@ -34,6 +38,10 @@ export async function readMetadata(file: File): Promise<TrackMetadata> {
     title: common.title ?? '',
     artists,
     album: common.album ?? '',
+    trackNumber: common.track.no ? String(common.track.no) : '',
+    year: common.year ? String(common.year) : '',
+    genre: common.genre?.[0] ?? '',
+    contentRating: 'unspecified',
     coverArt,
     coverArtMime,
     bitrate: metadata.format.bitrate ?? null,

@@ -39,7 +39,9 @@ async function findExisting(paths: string[]): Promise<string | null> {
     try {
       await access(p);
       return p;
-    } catch {}
+    } catch {
+      // Keep probing candidate paths.
+    }
   }
   return null;
 }
@@ -49,7 +51,9 @@ async function findFfmpegDir(): Promise<string | null> {
     try {
       await access(join(dir, ffmpegBinary));
       return dir;
-    } catch {}
+    } catch {
+      // Keep probing candidate paths.
+    }
   }
   return null;
 }

@@ -1,5 +1,5 @@
 import { useRef, useMemo, useEffect, useState } from 'react';
-import { ImageIcon, Search } from 'lucide-react';
+import { ImageIcon, Search, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { arrayBufferToObjectUrl } from '@/lib/image-utils';
 import { CoverArtSearch } from '@/components/cover-art-search';
@@ -45,7 +45,7 @@ export function CoverArtPicker({
     <div className="flex flex-col items-center gap-3">
       <div
         onClick={() => inputRef.current?.click()}
-        className="group relative h-[200px] w-[200px] cursor-pointer overflow-hidden rounded-xl border border-white/[0.06] bg-muted shadow-lg shadow-black/25 transition-all duration-200 hover:border-primary/40 hover:shadow-primary/10"
+        className="group relative size-[220px] cursor-pointer overflow-hidden rounded-[22px] bg-muted shadow-2xl shadow-black/20 transition-all duration-200 hover:scale-[1.01]"
       >
         {previewUrl ? (
           <>
@@ -61,10 +61,7 @@ export function CoverArtPicker({
             </div>
           </>
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-            <ImageIcon className="h-10 w-10 text-primary/40" />
-            <span className="text-xs">Upload cover art</span>
-          </div>
+          <GeneratedCover />
         )}
       </div>
 
@@ -77,12 +74,12 @@ export function CoverArtPicker({
       />
 
       <Button
-        variant="outline"
+        variant="secondary"
         size="sm"
         onClick={() => setSearchOpen(true)}
-        className="w-[200px]"
+        className="h-auto w-[220px] rounded-2xl bg-card py-3 shadow-sm"
       >
-        <Search className="mr-2 h-4 w-4" />
+        <Search className="mr-2 h-4 w-4 text-primary" />
         Search Cover Art
       </Button>
 
@@ -92,6 +89,34 @@ export function CoverArtPicker({
         onSelect={onCoverArtSearch}
         initialQuery={searchQuery}
       />
+    </div>
+  );
+}
+
+function GeneratedCover() {
+  return (
+    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-gradient-to-br from-[#e2e6e8] to-[#9aa2a8] p-5 text-[#050505]">
+      <p className="relative z-10 max-w-[72%] text-left text-xl font-semibold leading-tight">
+        Untitled
+      </p>
+      <div className="absolute left-1/2 top-1/2 size-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#050507] shadow-xl">
+        <div className="absolute inset-3 rounded-full border border-white/15" />
+        <div className="absolute inset-6 rounded-full border border-white/15" />
+        <div className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
+        <div className="absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#cfd4d7]" />
+      </div>
+      <div className="relative z-10 flex items-center justify-between">
+        <span className="text-xs font-semibold">Spleeve</span>
+        <div className="flex size-10 items-center justify-center rounded-full bg-black/10">
+          <ImageIcon className="size-4" />
+        </div>
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 backdrop-blur-[2px] transition-opacity group-hover:opacity-100">
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+          <Sparkles className="size-4" />
+          Add image
+        </span>
+      </div>
     </div>
   );
 }

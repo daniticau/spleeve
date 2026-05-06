@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Music, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FileDropzoneProps {
@@ -51,11 +51,13 @@ export function FileDropzone({ onFiles, hasFiles }: FileDropzoneProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       className={cn(
-        'cursor-pointer rounded-xl border border-dashed text-center transition-all duration-200',
+        'w-full max-w-full cursor-pointer text-center transition-all duration-200',
         isDragging
-          ? 'border-primary bg-primary/5 shadow-[0_0_24px_-6px] shadow-primary/30 scale-[1.01]'
-          : 'border-white/10 hover:border-white/20',
-        hasFiles ? 'px-4 py-3' : 'px-6 py-8',
+          ? 'scale-[1.01] bg-primary/10 shadow-lg shadow-primary/15'
+          : 'hover:bg-card/80',
+        hasFiles
+          ? 'rounded-2xl bg-card px-4 py-3 shadow-sm'
+          : 'rounded-[1.25rem] bg-card px-6 py-16 shadow-sm',
       )}
     >
       <input
@@ -68,22 +70,22 @@ export function FileDropzone({ onFiles, hasFiles }: FileDropzoneProps) {
       />
 
       {hasFiles ? (
-        <p className="text-xs text-muted-foreground">
-          <Upload className="mr-1.5 inline h-3 w-3" />
-          Drop or click to add more
-        </p>
+        <div className="flex h-5 items-center justify-center text-muted-foreground">
+          <Upload className="h-3.5 w-3.5" />
+          <span className="sr-only">Add MP3 files</span>
+        </div>
       ) : (
         <>
-          <div className="relative mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Upload className="h-5 w-5 text-primary" />
-            <div className="absolute inset-0 rounded-xl bg-primary/5 blur-xl" />
+          <div className="mx-auto mb-5 flex size-24 items-center justify-center rounded-full bg-primary/15">
+            <Music className="size-11 text-primary" />
           </div>
-          <p className="text-sm font-medium text-foreground">
-            Drop your MP3(s) here
+          <p className="text-xl font-semibold text-foreground">
+            No tracks yet
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            or click to browse
-          </p>
+          <div className="mx-auto mt-7 inline-flex items-center gap-3 rounded-2xl bg-primary px-5 py-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20">
+            <Upload className="size-5" />
+            Import MP3
+          </div>
         </>
       )}
     </div>

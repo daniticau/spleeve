@@ -12,6 +12,7 @@ export function writeMetadata(
   replayGain?: ReplayGainData,
 ): Blob {
   const writer = new ID3Writer(originalBuffer);
+  const setRawFrame = writer.setFrame.bind(writer) as (frameName: string, frameValue: unknown) => void;
 
   if (metadata.title) {
     writer.setFrame('TIT2', metadata.title);
@@ -22,6 +23,21 @@ export function writeMetadata(
   }
   if (metadata.album) {
     writer.setFrame('TALB', metadata.album);
+  }
+  if (metadata.trackNumber) {
+    writer.setFrame('TRCK', metadata.trackNumber);
+  }
+  if (metadata.year) {
+    setRawFrame('TYER', metadata.year);
+  }
+  if (metadata.genre) {
+    writer.setFrame('TCON', [metadata.genre]);
+  }
+  if (metadata.contentRating !== 'unspecified') {
+    writer.setFrame('TXXX', {
+      description: 'CONTENT_RATING',
+      value: metadata.contentRating === 'explicit' ? 'Explicit' : 'Clean',
+    });
   }
   if (metadata.coverArt) {
     writer.setFrame('APIC', {

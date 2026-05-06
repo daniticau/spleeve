@@ -164,7 +164,7 @@ export function WaveformEditor({
           type="button"
           onClick={controls.toggle}
           disabled={!audioBuffer}
-          className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground disabled:opacity-50"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
         >
           {playerState.playing ? (
             <Pause className="h-4 w-4" />
@@ -196,7 +196,7 @@ export function WaveformEditor({
             }}
             onPointerDown={(e) => onPointerDown(e, 'start')}
           >
-            <div className="mx-auto h-full w-[3px] rounded-full bg-foreground/70 transition-colors hover:bg-foreground" />
+            <div className="mx-auto h-full w-[4px] rounded-full bg-foreground/70 transition-colors hover:bg-foreground" />
           </div>
 
           {/* Right trim handle */}
@@ -208,7 +208,7 @@ export function WaveformEditor({
             }}
             onPointerDown={(e) => onPointerDown(e, 'end')}
           >
-            <div className="mx-auto h-full w-[3px] rounded-full bg-foreground/70 transition-colors hover:bg-foreground" />
+            <div className="mx-auto h-full w-[4px] rounded-full bg-foreground/70 transition-colors hover:bg-foreground" />
           </div>
 
           {/* Playhead */}
@@ -220,7 +220,7 @@ export function WaveformEditor({
       </div>
 
       {/* Time display + reset + children — below the waveform */}
-      <div className="flex h-6 items-center gap-2 pl-9">
+      <div className="flex min-h-7 flex-wrap items-center gap-2 pl-11">
         <span className="font-mono text-xs text-muted-foreground">
           {formatTime(playerState.currentTime)}
           <span className="text-muted-foreground/50"> / </span>
@@ -229,7 +229,7 @@ export function WaveformEditor({
         <button
           type="button"
           onClick={handleReset}
-          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground ${isTrimmed ? 'visible' : 'invisible'}`}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${isTrimmed ? 'visible' : 'invisible'}`}
           title="Reset trim"
         >
           <RotateCcw className="h-3 w-3" />
