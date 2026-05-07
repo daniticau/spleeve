@@ -15,6 +15,7 @@ import { applyGain } from '@/lib/audio/normalizer';
 import { encodeMp3 } from '@/lib/audio/mp3-encoder';
 import { downloadBlob, saveToFolder } from '@/lib/download';
 import { saveFolder, loadFolder } from '@/lib/store/folder-store';
+import { loadLibrary, saveLibrary, type CachedTrack } from '@/lib/store/library-store';
 import { parseFilename } from '@/lib/metadata/filename-parser';
 import { searchItunes, fetchCoverArtAsBuffer } from '@/lib/itunes/search';
 import { filesReducer, generateFileId, type FilesState } from '@/lib/store/file-store';
@@ -25,6 +26,13 @@ function App() {
     localStorage.getItem('theme') === 'dark' ? 'dark' : 'light',
   );
   const [themeSpinning, setThemeSpinning] = useState(false);
+  const [libraryRestored, setLibraryRestored] = useState(false);
+  const restoringLibraryRef = useRef(true);
+  const librarySaveTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  const isDemoMode = useMemo(
+    () => new URLSearchParams(window.location.search).has('demo'),
+    [],
+  );
 
   // Output folder state (global)
   const [dirHandle, setDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
@@ -42,6 +50,7 @@ function App() {
 
   useEffect(() => () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
+    if (librarySaveTimer.current) clearTimeout(librarySaveTimer.current);
   }, []);
 
   useEffect(() => {
@@ -69,6 +78,85 @@ function App() {
       }
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (isDemoMode) {
+      restoringLibraryRef.current = false;
+      setLibraryRestored(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    loadLibrary()
+      .then(async (tracks) => {
+        if (cancelled) return;
+        for (const track of tracks) {
+          const trimEnd = track.trimEnd ?? 0;
+          dispatch({
+            type: 'RESTORE_FILE',
+            id: track.id,
+            file: track.file,
+            buffer: track.originalBuffer,
+            metadata: track.metadata,
+            loudness: track.loudness,
+            normalizeEnabled: track.normalizeEnabled,
+            trimStart: track.trimStart,
+            trimEnd,
+          });
+
+          try {
+            const audioBuffer = await decodeAudioBuffer(track.originalBuffer.slice(0));
+            const waveform = extractWaveform(audioBuffer);
+            if (cancelled) return;
+            dispatch({ type: 'SET_AUDIO_BUFFER', id: track.id, audioBuffer, waveform });
+            if (trimEnd > 0 && trimEnd < waveform.duration) {
+              dispatch({ type: 'SET_TRIM', id: track.id, trimStart: track.trimStart, trimEnd });
+            }
+          } catch (err) {
+            console.error('Cached audio decode failed:', err);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Library restore failed:', err);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          restoringLibraryRef.current = false;
+          setLibraryRestored(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemoMode]);
+
+  useEffect(() => {
+    if (restoringLibraryRef.current) return;
+    if (librarySaveTimer.current) clearTimeout(librarySaveTimer.current);
+
+    librarySaveTimer.current = setTimeout(() => {
+      const tracks: CachedTrack[] = [...files.values()]
+        .filter((entry) => entry.status === 'ready' && entry.metadata && entry.originalBuffer)
+        .map((entry) => ({
+          id: entry.id,
+          file: entry.file,
+          originalBuffer: entry.originalBuffer as ArrayBuffer,
+          metadata: entry.metadata as TrackMetadata,
+          loudness: entry.loudness,
+          normalizeEnabled: entry.normalizeEnabled,
+          trimStart: entry.trimStart,
+          trimEnd: entry.waveform ? entry.trimEnd : null,
+          savedAt: Date.now(),
+        }));
+
+      saveLibrary(tracks).catch((err) => {
+        console.error('Library cache failed:', err);
+      });
+    }, 350);
+  }, [files]);
 
   const handlePickFolder = useCallback(async () => {
     try {
@@ -116,26 +204,55 @@ function App() {
     );
   }, [showToast]);
 
+  const handleDemoTrack = useCallback(async () => {
+    try {
+      const response = await fetch('/demo-track.mp3');
+      if (!response.ok) throw new Error('Demo track missing');
+
+      const blob = await response.blob();
+      const file = new File([blob], 'Spleeve Demo - Local File Test.mp3', { type: 'audio/mpeg' });
+      const id = generateFileId();
+      dispatch({ type: 'ADD_FILES', entries: [{ id, file }] });
+
+      const buffer = await file.arrayBuffer();
+      const metadata: TrackMetadata = {
+        title: 'Local File Test',
+        artists: ['Spleeve Demo'],
+        album: 'Spleeve',
+        trackNumber: '1',
+        year: '2026',
+        genre: 'Electronic',
+        contentRating: 'clean',
+        coverArt: null,
+        coverArtMime: null,
+        bitrate: null,
+      };
+      dispatch({ type: 'FILE_LOADED', id, buffer, metadata });
+
+      try {
+        const audioBuffer = await decodeAudioBuffer(buffer.slice(0));
+        const waveform = extractWaveform(audioBuffer);
+        dispatch({ type: 'SET_AUDIO_BUFFER', id, audioBuffer, waveform });
+      } catch (decodeErr) {
+        console.error('Demo audio decode failed:', decodeErr);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Could not load demo track');
+    }
+  }, [showToast]);
+
   const demoLoadedRef = useRef(false);
 
   useEffect(() => {
     if (demoLoadedRef.current) return;
-    if (!new URLSearchParams(window.location.search).has('demo')) return;
+    if (!libraryRestored) return;
+    if (files.size > 0) return;
+    if (!isDemoMode) return;
     demoLoadedRef.current = true;
 
-    fetch('/demo-track.mp3')
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Demo track missing');
-        const blob = await response.blob();
-        await handleFiles([
-          new File([blob], 'Spleeve Demo - Local File Test.mp3', { type: 'audio/mpeg' }),
-        ]);
-      })
-      .catch((err) => {
-        console.error(err);
-        showToast('Could not load demo track');
-      });
-  }, [handleFiles, showToast]);
+    void handleDemoTrack();
+  }, [files.size, handleDemoTrack, isDemoMode, libraryRestored]);
 
   // Track which file IDs have LUFS measurement in flight
   const measuringIds = useRef(new Set<string>());

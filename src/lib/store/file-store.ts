@@ -27,6 +27,17 @@ export type FilesState = Map<string, FileEntry>;
 
 export type FilesAction =
   | { type: 'ADD_FILES'; entries: Array<{ id: string; file: File }> }
+  | {
+      type: 'RESTORE_FILE';
+      id: string;
+      file: File;
+      buffer: ArrayBuffer;
+      metadata: TrackMetadata;
+      loudness: LoudnessResult | null;
+      normalizeEnabled: boolean;
+      trimStart: number;
+      trimEnd: number;
+    }
   | { type: 'FILE_LOADED'; id: string; buffer: ArrayBuffer; metadata: TrackMetadata }
   | { type: 'FILE_LOAD_ERROR'; id: string }
   | { type: 'REMOVE_FILE'; id: string }
@@ -72,6 +83,28 @@ export function filesReducer(state: FilesState, action: FilesAction): FilesState
           trimEnd: 0,
         });
       }
+      return next;
+    }
+    case 'RESTORE_FILE': {
+      const next = new Map(state);
+      next.set(action.id, {
+        id: action.id,
+        file: action.file,
+        originalBuffer: action.buffer,
+        metadata: action.metadata,
+        initialMetadata: structuredClone(action.metadata),
+        status: 'ready',
+        loudness: action.loudness,
+        measuringLoudness: false,
+        loudnessError: false,
+        autoFilling: false,
+        saved: false,
+        normalizeEnabled: action.normalizeEnabled,
+        audioBuffer: null,
+        waveform: null,
+        trimStart: action.trimStart,
+        trimEnd: action.trimEnd,
+      });
       return next;
     }
     case 'FILE_LOADED':
