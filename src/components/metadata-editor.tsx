@@ -373,43 +373,16 @@ export function MetadataEditor({
 
       <div className="space-y-4">
         <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="flex justify-center lg:justify-start">
-            <CoverArtPicker
-              coverArt={metadata.coverArt}
-              coverArtMime={metadata.coverArtMime}
-              title={metadata.title}
-              artist={metadata.artists.join(', ')}
-              onImageUpload={onImageUpload}
-            />
-          </div>
-
-          <div className="overflow-hidden rounded-2xl bg-card shadow-sm">
-            <Field
-              label="Title"
-              value={metadata.title}
-              onChange={(v) => updateMetadata({ title: v })}
-            />
-            <Separator />
-            <div className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 px-4 py-3.5">
-              <Label className="text-sm font-medium text-muted-foreground">Artist</Label>
-              <ArtistLineInput
-                key={metadata.artists.join('\0')}
-                values={metadata.artists}
-                onChange={(artists) => updateMetadata({ artists })}
-                placeholder="e.g., Kanye West"
+          <div className="space-y-4">
+            <div className="flex justify-center lg:justify-start">
+              <CoverArtPicker
+                coverArt={metadata.coverArt}
+                coverArtMime={metadata.coverArtMime}
+                title={metadata.title}
+                artist={metadata.artists.join(', ')}
+                onImageUpload={onImageUpload}
               />
             </div>
-            <Separator />
-            <Field
-              label="Album"
-              value={metadata.album}
-              onChange={(v) => updateMetadata({ album: v })}
-            />
-          </div>
-        </div>
-
-        <div className="grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div>
             <input
               ref={photoInputRef}
               type="file"
@@ -430,89 +403,120 @@ export function MetadataEditor({
             </div>
           </div>
 
-          <section className="min-w-0 space-y-2">
-            <button
-              type="button"
-              onClick={() => setShowsExtras((current) => !current)}
-              className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm"
-            >
-              <IconBubble tint="purple">
-                <Tag className="size-4" />
-              </IconBubble>
-              <span className="text-sm font-semibold">Extra Metadata</span>
-              <span className="ml-auto text-muted-foreground">
-                {showsExtras ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-              </span>
-            </button>
-
-            {showsExtras && (
-              <div className="rounded-2xl bg-card p-3 shadow-sm">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <CompactField
-                    label="Track"
-                    value={metadata.trackNumber}
-                    onChange={(trackNumber) => updateMetadata({ trackNumber })}
-                    placeholder="4"
-                  />
-                  <CompactField
-                    label="Year"
-                    value={metadata.year}
-                    onChange={(year) => updateMetadata({ year })}
-                    placeholder="2026"
-                  />
-                </div>
-                <div className="mt-3">
-                  <CompactField
-                    label="Genre"
-                    value={metadata.genre}
-                    onChange={(genre) => updateMetadata({ genre })}
-                    placeholder="Pop"
-                  />
-                </div>
-                <div className="mt-3 grid grid-cols-3 rounded-xl bg-muted p-1">
-                  {(['unspecified', 'clean', 'explicit'] as ContentRating[]).map((rating) => (
-                    <button
-                      key={rating}
-                      type="button"
-                      onClick={() => updateMetadata({ contentRating: rating })}
-                      className={`rounded-lg px-3 py-2 text-xs font-semibold capitalize transition ${
-                        metadata.contentRating === rating
-                          ? 'bg-card text-foreground shadow-sm'
-                          : 'text-muted-foreground'
-                      }`}
-                    >
-                      {rating === 'unspecified' ? 'None' : rating}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-
-        {waveform && (
-          <section>
-            <div className="rounded-2xl bg-card p-4 shadow-sm">
-              <WaveformEditor
-                waveform={waveform}
-                audioBuffer={audioBuffer}
-                trimStart={trimStart}
-                trimEnd={trimEnd}
-                onTrimChange={onTrimChange}
+          <div className="min-w-0 space-y-4">
+            <div className="overflow-hidden rounded-2xl bg-card shadow-sm">
+              <Field
+                label="Title"
+                value={metadata.title}
+                onChange={(v) => updateMetadata({ title: v })}
               />
-              <div className="mt-3 border-t border-border pt-3">
-                <LoudnessInline
-                  measuring={measuring}
-                  loudnessError={loudnessError}
-                  lufsDisplay={lufsDisplay}
-                  replayGain={replayGain?.gain}
-                  normalizeEnabled={normalizeEnabled}
-                  onNormalizeChange={onNormalizeChange}
-                />
+              <Separator />
+              <div className="grid gap-px bg-border sm:grid-cols-2">
+                <div className="bg-card px-4 py-3.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">Artist</Label>
+                  <ArtistLineInput
+                    key={metadata.artists.join('\0')}
+                    values={metadata.artists}
+                    onChange={(artists) => updateMetadata({ artists })}
+                    placeholder="e.g., Kanye West"
+                  />
+                </div>
+                <div className="bg-card px-4 py-3.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">Album</Label>
+                  <Input
+                    value={metadata.album}
+                    onChange={(event) => updateMetadata({ album: event.target.value })}
+                    placeholder="Album"
+                    className="h-8 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0 md:text-base"
+                  />
+                </div>
               </div>
             </div>
-          </section>
-        )}
+
+            <section className="min-w-0 space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowsExtras((current) => !current)}
+                className="flex w-full items-center gap-3 rounded-2xl bg-card px-4 py-3 shadow-sm"
+              >
+                <IconBubble tint="purple">
+                  <Tag className="size-4" />
+                </IconBubble>
+                <span className="text-sm font-semibold">Extra Metadata</span>
+                <span className="ml-auto text-muted-foreground">
+                  {showsExtras ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                </span>
+              </button>
+
+              {showsExtras && (
+                <div className="rounded-2xl bg-card p-3 shadow-sm">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <CompactField
+                      label="Track"
+                      value={metadata.trackNumber}
+                      onChange={(trackNumber) => updateMetadata({ trackNumber })}
+                      placeholder="4"
+                    />
+                    <CompactField
+                      label="Year"
+                      value={metadata.year}
+                      onChange={(year) => updateMetadata({ year })}
+                      placeholder="2026"
+                    />
+                  </div>
+                  <div className="mt-3">
+                    <CompactField
+                      label="Genre"
+                      value={metadata.genre}
+                      onChange={(genre) => updateMetadata({ genre })}
+                      placeholder="Pop"
+                    />
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 rounded-xl bg-muted p-1">
+                    {(['unspecified', 'clean', 'explicit'] as ContentRating[]).map((rating) => (
+                      <button
+                        key={rating}
+                        type="button"
+                        onClick={() => updateMetadata({ contentRating: rating })}
+                        className={`rounded-lg px-3 py-2 text-xs font-semibold capitalize transition ${
+                          metadata.contentRating === rating
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        {rating === 'unspecified' ? 'None' : rating}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {waveform && (
+              <section>
+                <div className="rounded-2xl bg-card p-4 shadow-sm">
+                  <WaveformEditor
+                    waveform={waveform}
+                    audioBuffer={audioBuffer}
+                    trimStart={trimStart}
+                    trimEnd={trimEnd}
+                    onTrimChange={onTrimChange}
+                  />
+                  <div className="mt-3 border-t border-border pt-3">
+                    <LoudnessInline
+                      measuring={measuring}
+                      loudnessError={loudnessError}
+                      lufsDisplay={lufsDisplay}
+                      replayGain={replayGain?.gain}
+                      normalizeEnabled={normalizeEnabled}
+                      onNormalizeChange={onNormalizeChange}
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+          </div>
+        </div>
       </div>
 
       <CoverArtSearch
@@ -1269,7 +1273,7 @@ function GeneratedCoverPreview({
         />
       </div>
       {artist && (
-        <div className="absolute bottom-[8%] right-[8%] z-10 line-clamp-2 h-[15%] w-[46%] text-right text-[0.65rem] font-semibold leading-tight">
+        <div className="absolute bottom-[8%] right-[8%] z-10 flex aspect-square w-[28%] items-end justify-end text-right text-sm font-semibold leading-tight">
           {artist}
         </div>
       )}
@@ -1399,12 +1403,14 @@ async function generateTextCover({
 
   ctx.fillStyle = text;
   ctx.textBaseline = 'top';
-  ctx.font = `600 ${size * 0.088}px Geist, system-ui, sans-serif`;
-  wrapText(ctx, cleanField(title) || 'Untitled', padding, padding, size - padding * 2, size * 0.102, 4);
+  const coverTextSize = size * 0.088;
+  const coverLineHeight = size * 0.102;
+  ctx.font = `600 ${coverTextSize}px Geist, system-ui, sans-serif`;
+  wrapText(ctx, cleanField(title) || 'Untitled', padding, padding, size - padding * 2, coverLineHeight, 4);
   if (artist) {
-    ctx.font = `600 ${size * 0.052}px Geist, system-ui, sans-serif`;
+    ctx.font = `600 ${coverTextSize}px Geist, system-ui, sans-serif`;
     ctx.textAlign = 'right';
-    wrapText(ctx, artist, size - padding, size - padding - size * 0.15, size * 0.46, size * 0.06, 2, 'right');
+    drawBottomAlignedText(ctx, artist, size - padding, size - padding, size * 0.28, coverLineHeight, 3, 'right');
   }
 
   const blob = await new Promise<Blob>((resolve, reject) => {
@@ -1680,4 +1686,48 @@ function wrapText(
   if (line && lineCount < maxLines) {
     ctx.fillText(line, x, y);
   }
+}
+
+function drawBottomAlignedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  bottom: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+  align: CanvasTextAlign,
+) {
+  const lines = wrapLines(ctx, text, maxWidth, maxLines);
+  let y = bottom - lines.length * lineHeight;
+  ctx.textAlign = align;
+  for (const line of lines) {
+    ctx.fillText(line, x, y);
+    y += lineHeight;
+  }
+}
+
+function wrapLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+) {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+
+  for (const word of words) {
+    const testLine = line ? `${line} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+      if (lines.length >= maxLines - 1) break;
+    } else {
+      line = testLine;
+    }
+  }
+
+  if (line && lines.length < maxLines) lines.push(line);
+  return lines;
 }

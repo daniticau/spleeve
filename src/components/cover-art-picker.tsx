@@ -94,7 +94,7 @@ function GeneratedCover({ title, artist }: { title: string; artist: string }) {
         <div className="absolute left-1/2 top-1/2 aspect-square w-[5.5%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#cfd4d7]" />
       </div>
       {displayArtist && (
-        <p className="absolute bottom-[8%] right-[8%] z-10 flex h-[15%] w-[46%] items-end justify-end text-right text-[11px] font-semibold leading-tight">
+        <p className="absolute bottom-[8%] right-[8%] z-10 flex aspect-square w-[28%] items-end justify-end text-right text-[19px] font-semibold leading-tight">
           {displayArtist}
         </p>
       )}
