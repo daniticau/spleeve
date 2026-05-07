@@ -15,7 +15,6 @@ import {
   Search,
   CircleEllipsis,
   Share2,
-  Sparkles,
   Tag,
   Target,
   RotateCcw,
@@ -66,27 +65,15 @@ interface MetadataEditorProps {
   onTrimChange: (start: number, end: number) => void;
 }
 
-type EditorSheet = 'cover' | 'crop' | 'normalize' | 'export' | 'more' | null;
+type EditorSheet = 'crop' | 'normalize' | 'export' | 'more' | null;
 type ContentRating = TrackMetadata['contentRating'];
 type CoverQuality = 'sixHundred' | 'thousand' | 'max';
 type CoverCropPreset = 'center' | 'top' | 'face' | 'fitBlurred';
-type CoverTemplate = 'minimalist' | 'vinyl' | 'cassette' | 'sticker' | 'typography';
 
 interface CoverSnapshot {
   coverArt: ArrayBuffer | null;
   coverArtMime: string | null;
 }
-
-const COVER_STYLES = [
-  ['#E2E6E8', '#9AA2A8', '#050505'],
-  ['#F5E9D6', '#F59E42', '#232329'],
-  ['#19254A', '#7C5CFF', '#F1EAF8'],
-  ['#F8D447', '#F05A28', '#2B1410'],
-  ['#0C3B4C', '#39C6D6', '#E9FAFF'],
-  ['#F7C2D2', '#F04D98', '#4B153F'],
-  ['#E7ECEA', '#8BA49A', '#121212'],
-  ['#332A5C', '#D8FF62', '#F5F7EC'],
-] as const;
 
 const COVER_QUALITY_OPTIONS: Array<{ value: CoverQuality; label: string; size: number }> = [
   { value: 'sixHundred', label: '600x600', size: 600 },
@@ -99,14 +86,6 @@ const COVER_CROP_OPTIONS: Array<{ value: CoverCropPreset; label: string }> = [
   { value: 'top', label: 'Top' },
   { value: 'face', label: 'Face-ish' },
   { value: 'fitBlurred', label: 'Fit + Blur' },
-];
-
-const COVER_TEMPLATE_OPTIONS: Array<{ value: CoverTemplate; label: string }> = [
-  { value: 'minimalist', label: 'Minimal' },
-  { value: 'vinyl', label: 'Vinyl' },
-  { value: 'cassette', label: 'Cassette' },
-  { value: 'sticker', label: 'Sticker' },
-  { value: 'typography', label: 'Type' },
 ];
 
 export function MetadataEditor({
@@ -176,22 +155,6 @@ export function MetadataEditor({
     updateMetadata({ coverArt, coverArtMime: 'image/jpeg' });
   }, [rememberCoverSnapshot, updateMetadata]);
 
-  const applyGeneratedCover = useCallback(async (styleIndex = 0, template: CoverTemplate = 'vinyl') => {
-    const [background, backgroundEnd, text] = COVER_STYLES[styleIndex];
-    rememberCoverSnapshot();
-    const coverArt = await generateTemplateCover({
-      title: metadata.title,
-      artist: metadata.artists[0] ?? '',
-      background,
-      backgroundEnd,
-      text,
-      size: coverSize,
-      template,
-    });
-    updateMetadata({ coverArt, coverArtMime: 'image/jpeg' });
-    setActiveSheet(null);
-  }, [coverSize, metadata.artists, metadata.title, rememberCoverSnapshot, updateMetadata]);
-
   const cleanMetadata = useCallback(() => {
     updateMetadata({
       title: titleCase(cleanTitle(metadata.title)),
@@ -203,13 +166,10 @@ export function MetadataEditor({
     });
   }, [metadata, updateMetadata]);
 
-  const makeSpotifyLike = useCallback(async () => {
+  const makeSpotifyLike = useCallback(() => {
     cleanMetadata();
     onNormalizeChange(true);
-    if (!metadata.coverArt) {
-      await applyGeneratedCover(0);
-    }
-  }, [applyGeneratedCover, cleanMetadata, metadata.coverArt, onNormalizeChange]);
+  }, [cleanMetadata, onNormalizeChange]);
 
   const processSelectedCover = useCallback(async (source: Blob) => {
     const coverArt = await processCoverImage(source, {
@@ -227,22 +187,13 @@ export function MetadataEditor({
     }
   }, [processSelectedCover]);
 
-  const coverBlob = useCallback(async () => {
+  const coverBlob = useCallback(async (): Promise<Blob | null> => {
     if (metadata.coverArt && metadata.coverArtMime) {
       return new Blob([metadata.coverArt], { type: metadata.coverArtMime });
     }
 
-    const [background, backgroundEnd, text] = COVER_STYLES[0];
-    const buffer = await generateTextCover({
-      title: metadata.title,
-      artist: metadata.artists[0] ?? '',
-      background,
-      backgroundEnd,
-      text,
-      size: coverSize,
-    });
-    return new Blob([buffer], { type: 'image/jpeg' });
-  }, [coverSize, metadata.artists, metadata.coverArt, metadata.coverArtMime, metadata.title]);
+    return null;
+  }, [metadata.coverArt, metadata.coverArtMime]);
 
   const pasteCoverFromClipboard = useCallback(async () => {
     try {
@@ -263,6 +214,7 @@ export function MetadataEditor({
   const copyCover = useCallback(async () => {
     try {
       const blob = await coverBlob();
+      if (!blob) return;
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
       setActiveSheet(null);
     } catch (err) {
@@ -272,10 +224,11 @@ export function MetadataEditor({
 
   const downloadCover = useCallback(async () => {
     const blob = await coverBlob();
+    if (!blob) return;
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'Spleeve Cover.jpg';
+    link.download = 'Cover.jpg';
     document.body.append(link);
     link.click();
     link.remove();
@@ -330,9 +283,10 @@ export function MetadataEditor({
   const shareCover = useCallback(async () => {
     try {
       const blob = await coverBlob();
-      const file = new File([blob], 'Spleeve Cover.jpg', { type: blob.type });
+      if (!blob) return;
+      const file = new File([blob], 'Cover.jpg', { type: blob.type });
       if (!navigator.canShare?.({ files: [file] })) return;
-      await navigator.share({ files: [file], title: 'Spleeve Cover' });
+      await navigator.share({ files: [file], title: 'Cover' });
       setActiveSheet(null);
     } catch (err) {
       console.error('Share cover failed:', err);
@@ -378,8 +332,6 @@ export function MetadataEditor({
               <CoverArtPicker
                 coverArt={metadata.coverArt}
                 coverArtMime={metadata.coverArtMime}
-                title={metadata.title}
-                artist={metadata.artists.join(', ')}
                 onImageUpload={onImageUpload}
               />
             </div>
@@ -529,59 +481,6 @@ export function MetadataEditor({
         initialQuery={searchQuery}
       />
 
-      <Dialog open={activeSheet === 'cover'} onOpenChange={(open) => !open && setActiveSheet(null)}>
-        <DialogContent className="max-w-xl rounded-3xl p-5">
-          <DialogHeader>
-            <DialogTitle>Spleeve Cover</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {COVER_STYLES.map(([background, backgroundEnd, text], index) => (
-              <button
-                key={`${background}-${backgroundEnd}`}
-                type="button"
-                onClick={() => void applyGeneratedCover(index)}
-                className="overflow-hidden rounded-2xl shadow-sm ring-1 ring-border transition hover:-translate-y-0.5"
-              >
-                <GeneratedCoverPreview
-                  title={metadata.title}
-                  artist={metadata.artists[0] ?? ''}
-                  background={background}
-                  backgroundEnd={backgroundEnd}
-                  text={text}
-                />
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-5 gap-2">
-            {COVER_TEMPLATE_OPTIONS.map((template) => (
-              <button
-                key={template.value}
-                type="button"
-                onClick={() => void applyGeneratedCover(0, template.value)}
-                className="rounded-xl bg-card px-2 py-2 text-xs font-semibold text-foreground shadow-sm transition hover:bg-secondary"
-              >
-                {template.label}
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button
-              variant="outline"
-              className="rounded-2xl"
-              onClick={() => {
-                rememberCoverSnapshot();
-                updateMetadata({ coverArt: null, coverArtMime: null });
-              }}
-            >
-              Remove Cover
-            </Button>
-            <Button className="rounded-2xl" onClick={() => void applyGeneratedCover(0)}>
-              Generate Spleeve Cover
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {activeSheet === 'more' && (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-black/10 p-4 backdrop-blur-xs">
           <button
@@ -605,7 +504,6 @@ export function MetadataEditor({
               <ToolRow
                 icon={<ClipboardPaste className="size-4" />}
                 title="Paste Cover"
-                subtitle="Use image data from the clipboard"
                 tint="green"
                 onClick={() => void pasteCoverFromClipboard()}
                 disabled={!navigator.clipboard?.read}
@@ -614,7 +512,6 @@ export function MetadataEditor({
               <ToolRow
                 icon={<ImageIcon className="size-4" />}
                 title="Remove Cover"
-                subtitle="Use the default Spleeve artwork"
                 tint="orange"
                 onClick={() => {
                   rememberCoverSnapshot();
@@ -624,18 +521,9 @@ export function MetadataEditor({
                 disabled={!metadata.coverArt}
               />
               <Separator />
-              <ToolRow
-                icon={<Sparkles className="size-4" />}
-                title="Spleeve Cover"
-                subtitle="Pick a generated color style"
-                tint="green"
-                onClick={() => setActiveSheet('cover')}
-              />
-              <Separator />
               <ToolSetting
                 icon={<ImageIcon className="size-4" />}
                 title={`Quality: ${coverQualityOption.label}`}
-                subtitle="Artwork export size"
                 options={COVER_QUALITY_OPTIONS}
                 value={coverQuality}
                 onChange={(quality) => void applyCoverQuality(quality as CoverQuality)}
@@ -644,7 +532,6 @@ export function MetadataEditor({
               <ToolSetting
                 icon={<Crop className="size-4" />}
                 title={`Image Framing: ${coverCropLabel}`}
-                subtitle="How imported artwork is squared"
                 options={COVER_CROP_OPTIONS}
                 value={coverCropPreset}
                 onChange={(preset) => void applyCoverCropPreset(preset as CoverCropPreset)}
@@ -653,33 +540,30 @@ export function MetadataEditor({
               <ToolRow
                 icon={<Share2 className="size-4" />}
                 title="Share Cover"
-                subtitle="Open the system share sheet"
                 tint="green"
                 onClick={() => void shareCover()}
-                disabled={!navigator.canShare}
+                disabled={!metadata.coverArt || !navigator.canShare}
               />
               <Separator />
               <ToolRow
                 icon={<Copy className="size-4" />}
                 title="Copy Cover"
-                subtitle="Copy the current artwork"
                 tint="green"
                 onClick={() => void copyCover()}
-                disabled={!navigator.clipboard?.write}
+                disabled={!metadata.coverArt || !navigator.clipboard?.write}
               />
               <Separator />
               <ToolRow
                 icon={<Download className="size-4" />}
                 title="Save to Photos"
-                subtitle="Download artwork in the browser"
                 tint="green"
                 onClick={() => void downloadCover()}
+                disabled={!metadata.coverArt}
               />
               <Separator />
               <ToolRow
                 icon={<RotateCcw className="size-4" />}
                 title="Undo Cover"
-                subtitle="Restore the previous artwork"
                 tint="orange"
                 onClick={undoCoverChange}
                 disabled={!lastCoverSnapshot}
@@ -688,10 +572,9 @@ export function MetadataEditor({
               <ToolRow
                 icon={<Wand2 className="size-4" />}
                 title="Make Spotify-like"
-                subtitle="Clean tags, normalize, and fill missing art"
                 tint="green"
                 onClick={() => {
-                  void makeSpotifyLike();
+                  makeSpotifyLike();
                   setActiveSheet(null);
                 }}
               />
@@ -882,9 +765,9 @@ export function MetadataEditor({
             <ToolRow
               icon={<CheckCircle2 className="size-4" />}
               title="Make Spotify-like"
-              subtitle="Clean tags, normalize to -14 LUFS, square art"
+              subtitle="Clean tags and normalize to -14 LUFS"
               tint="green"
-              onClick={() => void makeSpotifyLike()}
+              onClick={makeSpotifyLike}
             />
             <ToolRow
               icon={<Download className="size-4" />}
@@ -981,7 +864,7 @@ function ToolRow({
 }: {
   icon: ReactNode;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   tint: 'green' | 'orange';
   onClick: () => void;
   disabled?: boolean;
@@ -996,7 +879,7 @@ function ToolRow({
       <IconBubble tint={tint}>{icon}</IconBubble>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+        {subtitle && <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>}
       </span>
       <ChevronRight className="size-4 text-muted-foreground" />
     </button>
@@ -1013,7 +896,7 @@ function ToolSetting({
 }: {
   icon: ReactNode;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   options: Array<{ value: CoverQuality | CoverCropPreset; label: string }>;
   value: CoverQuality | CoverCropPreset;
   onChange: (value: CoverQuality | CoverCropPreset) => void;
@@ -1024,7 +907,7 @@ function ToolSetting({
         <IconBubble tint="green">{icon}</IconBubble>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-foreground">{title}</span>
-          <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+          {subtitle && <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>}
         </span>
       </div>
       <div className="grid gap-1 rounded-xl bg-muted p-1 sm:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
@@ -1228,59 +1111,6 @@ function ExportPreview({ metadata }: { metadata: TrackMetadata }) {
   );
 }
 
-function GeneratedCoverPreview({
-  title,
-  artist,
-  background,
-  backgroundEnd,
-  text,
-}: {
-  title: string;
-  artist: string;
-  background: string;
-  backgroundEnd: string;
-  text: string;
-}) {
-  return (
-    <div
-      className="relative aspect-square overflow-hidden text-left"
-      style={{
-        color: text,
-        background: `linear-gradient(135deg, ${background}, ${backgroundEnd})`,
-      }}
-    >
-      <div className="absolute left-[8%] top-[8%] z-10 line-clamp-4 max-h-[34%] w-[84%] text-sm font-semibold leading-tight">
-        {cleanField(title) || 'Untitled'}
-      </div>
-      <div className="absolute left-1/2 top-1/2 aspect-square w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#050507]">
-        <div
-          className="absolute inset-0 rounded-full opacity-70"
-          style={{
-            background: 'conic-gradient(rgba(255,255,255,0.16), transparent, rgba(0,0,0,0.42), transparent, rgba(255,255,255,0.10), rgba(255,255,255,0.16))',
-          }}
-        />
-        {[0.28, 0.36, 0.44, 0.52, 0.6, 0.68, 0.76, 0.84, 0.92].map((diameter) => (
-          <div
-            key={diameter}
-            className="absolute left-1/2 top-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15"
-            style={{ width: `${diameter * 100}%` }}
-          />
-        ))}
-        <div className="absolute left-1/2 top-1/2 aspect-square w-[17%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary" />
-        <div
-          className="absolute left-1/2 top-1/2 aspect-square w-[5.5%] -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ background }}
-        />
-      </div>
-      {artist && (
-        <div className="absolute bottom-[8%] right-[8%] z-10 flex aspect-square w-[28%] items-end justify-end text-right text-sm font-semibold leading-tight">
-          {artist}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function useObjectUrl(buffer: ArrayBuffer | null, mime: string | null) {
   const previewUrl = useMemo(
     () => buffer && mime ? arrayBufferToObjectUrl(buffer, mime) : null,
@@ -1321,257 +1151,6 @@ function titleCase(value: string): string {
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
-}
-
-async function generateTextCover({
-  title,
-  artist,
-  background,
-  backgroundEnd,
-  text,
-  size = 1200,
-}: {
-  title: string;
-  artist: string;
-  background: string;
-  backgroundEnd: string;
-  text: string;
-  size?: number;
-}): Promise<ArrayBuffer> {
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas unavailable');
-
-  const gradient = ctx.createLinearGradient(0, 0, size, size);
-  gradient.addColorStop(0, background);
-  gradient.addColorStop(1, backgroundEnd);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-
-  const padding = size * 0.08;
-  const recordSide = size * 0.52;
-  const recordRadius = recordSide / 2;
-  const ringLineWidth = Math.max(1, recordSide * 0.008);
-
-  ctx.save();
-  ctx.translate(size / 2, size / 2);
-  ctx.fillStyle = '#050507';
-  ctx.beginPath();
-  ctx.arc(0, 0, recordRadius, 0, Math.PI * 2);
-  ctx.fill();
-
-  const conic = ctx.createConicGradient(0, 0, 0);
-  conic.addColorStop(0, 'rgba(255,255,255,0.16)');
-  conic.addColorStop(0.25, 'rgba(255,255,255,0)');
-  conic.addColorStop(0.5, 'rgba(0,0,0,0.42)');
-  conic.addColorStop(0.72, 'rgba(255,255,255,0)');
-  conic.addColorStop(1, 'rgba(255,255,255,0.10)');
-  ctx.globalAlpha = 0.7;
-  ctx.fillStyle = conic;
-  ctx.beginPath();
-  ctx.arc(0, 0, recordRadius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.13)';
-  ctx.lineWidth = ringLineWidth;
-  for (const diameter of [0.28, 0.36, 0.44, 0.52, 0.6, 0.68, 0.76, 0.84, 0.92]) {
-    ctx.beginPath();
-    ctx.arc(0, 0, (recordSide * diameter) / 2, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  const labelRadius = (recordSide * 0.17) / 2;
-  const labelGradient = ctx.createConicGradient(0, 0, 0);
-  labelGradient.addColorStop(0, '#1DB954');
-  labelGradient.addColorStop(0.25, 'rgba(29,185,84,0.72)');
-  labelGradient.addColorStop(0.5, 'rgba(29,185,84,0.96)');
-  labelGradient.addColorStop(0.75, 'rgba(29,185,84,0.72)');
-  labelGradient.addColorStop(1, '#1DB954');
-  ctx.fillStyle = '#1DB954';
-  ctx.fillStyle = labelGradient;
-  ctx.beginPath();
-  ctx.arc(0, 0, labelRadius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = background;
-  ctx.beginPath();
-  ctx.arc(0, 0, (recordSide * 0.055) / 2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.fillStyle = text;
-  ctx.textBaseline = 'top';
-  const coverTextSize = size * 0.088;
-  const coverLineHeight = size * 0.102;
-  ctx.font = `600 ${coverTextSize}px Geist, system-ui, sans-serif`;
-  wrapText(ctx, cleanField(title) || 'Untitled', padding, padding, size - padding * 2, coverLineHeight, 4);
-  if (artist) {
-    ctx.font = `600 ${coverTextSize}px Geist, system-ui, sans-serif`;
-    ctx.textAlign = 'right';
-    drawBottomAlignedText(ctx, artist, size - padding, size - padding, size * 0.28, coverLineHeight, 3, 'right');
-  }
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Could not encode cover')), 'image/jpeg', 0.92);
-  });
-  return blob.arrayBuffer();
-}
-
-async function generateTemplateCover({
-  template,
-  title,
-  artist,
-  background,
-  backgroundEnd,
-  text,
-  size,
-}: {
-  template: CoverTemplate;
-  title: string;
-  artist: string;
-  background: string;
-  backgroundEnd: string;
-  text: string;
-  size: number;
-}): Promise<ArrayBuffer> {
-  if (template === 'vinyl') {
-    return generateTextCover({ title, artist, background, backgroundEnd, text, size });
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas unavailable');
-
-  const gradient = ctx.createLinearGradient(0, 0, size, size);
-  gradient.addColorStop(0, background);
-  gradient.addColorStop(1, backgroundEnd);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-
-  if (template === 'cassette') drawCassetteTemplate(ctx, size, text);
-  if (template === 'sticker') drawStickerTemplate(ctx, size, background, text);
-  if (template === 'typography') drawTypographyTemplate(ctx, size, title, artist, text);
-
-  ctx.fillStyle = text;
-  const padding = size * 0.09;
-  if (template === 'minimalist') {
-    ctx.textBaseline = 'top';
-    ctx.font = `700 ${size * 0.105}px Geist, system-ui, sans-serif`;
-    wrapText(ctx, cleanField(title) || 'Untitled', padding, padding, size * 0.74, size * 0.12, 4);
-    if (artist) {
-      ctx.font = `600 ${size * 0.046}px Geist, system-ui, sans-serif`;
-      ctx.textAlign = 'left';
-      wrapText(ctx, artist, padding, size - padding - size * 0.08, size * 0.72, size * 0.055, 2);
-    }
-  } else if (template !== 'typography') {
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.font = `700 ${size * 0.072}px Geist, system-ui, sans-serif`;
-    wrapText(ctx, cleanField(title) || 'Untitled', size / 2, size * 0.45, size * 0.72, size * 0.084, 3, 'center');
-    if (artist) {
-      ctx.font = `600 ${size * 0.036}px Geist, system-ui, sans-serif`;
-      wrapText(ctx, artist, size / 2, size * 0.69, size * 0.62, size * 0.046, 2, 'center');
-    }
-  }
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Could not encode cover')), 'image/jpeg', 0.92);
-  });
-  return blob.arrayBuffer();
-}
-
-function drawCassetteTemplate(ctx: CanvasRenderingContext2D, size: number, text: string) {
-  const x = size * 0.16;
-  const y = size * 0.24;
-  const width = size * 0.68;
-  const height = size * 0.34;
-  ctx.fillStyle = 'rgba(255,255,255,0.28)';
-  roundRect(ctx, x, y, width, height, size * 0.035);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  roundRect(ctx, x + width * 0.1, y + height * 0.18, width * 0.8, height * 0.24, size * 0.02);
-  ctx.fill();
-  ctx.strokeStyle = text;
-  ctx.lineWidth = size * 0.011;
-  for (const reelX of [x + width * 0.3, x + width * 0.7]) {
-    ctx.beginPath();
-    ctx.arc(reelX, y + height * 0.62, size * 0.063, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(reelX, y + height * 0.62, size * 0.019, 0, Math.PI * 2);
-    ctx.fillStyle = text;
-    ctx.fill();
-  }
-}
-
-function drawStickerTemplate(ctx: CanvasRenderingContext2D, size: number, background: string, text: string) {
-  ctx.save();
-  ctx.translate(size * 0.5, size * 0.42);
-  ctx.rotate(-0.08);
-  ctx.fillStyle = 'rgba(255,255,255,0.72)';
-  roundRect(ctx, -size * 0.28, -size * 0.18, size * 0.56, size * 0.36, size * 0.055);
-  ctx.fill();
-  ctx.strokeStyle = text;
-  ctx.lineWidth = size * 0.01;
-  ctx.stroke();
-  ctx.fillStyle = background;
-  ctx.beginPath();
-  ctx.arc(size * 0.2, -size * 0.12, size * 0.06, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawTypographyTemplate(
-  ctx: CanvasRenderingContext2D,
-  size: number,
-  title: string,
-  artist: string,
-  text: string,
-) {
-  const phrase = cleanField(title) || 'Untitled';
-  ctx.save();
-  ctx.globalAlpha = 0.18;
-  ctx.fillStyle = text;
-  ctx.font = `800 ${size * 0.11}px Geist, system-ui, sans-serif`;
-  ctx.rotate(-0.16);
-  for (let y = -size * 0.05; y < size * 1.2; y += size * 0.16) {
-    ctx.fillText(phrase, -size * 0.12, y);
-  }
-  ctx.restore();
-
-  ctx.fillStyle = text;
-  ctx.textBaseline = 'top';
-  ctx.font = `800 ${size * 0.118}px Geist, system-ui, sans-serif`;
-  wrapText(ctx, phrase, size * 0.09, size * 0.18, size * 0.82, size * 0.13, 4);
-  if (artist) {
-    ctx.font = `600 ${size * 0.044}px Geist, system-ui, sans-serif`;
-    wrapText(ctx, artist, size * 0.09, size * 0.74, size * 0.72, size * 0.052, 2);
-  }
-}
-
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
 }
 
 async function processCoverImage(
@@ -1653,81 +1232,4 @@ function drawFitBlurredCover(
   const fitWidth = image.naturalWidth * fitScale;
   const fitHeight = image.naturalHeight * fitScale;
   ctx.drawImage(image, (size - fitWidth) / 2, (size - fitHeight) / 2, fitWidth, fitHeight);
-}
-
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxLines: number,
-  align: CanvasTextAlign = 'left',
-) {
-  ctx.textAlign = align;
-  const words = text.split(' ');
-  let line = '';
-  let lineCount = 0;
-
-  for (const word of words) {
-    const testLine = line ? `${line} ${word}` : word;
-    if (ctx.measureText(testLine).width > maxWidth && line) {
-      ctx.fillText(line, x, y);
-      line = word;
-      y += lineHeight;
-      lineCount += 1;
-      if (lineCount >= maxLines - 1) break;
-    } else {
-      line = testLine;
-    }
-  }
-
-  if (line && lineCount < maxLines) {
-    ctx.fillText(line, x, y);
-  }
-}
-
-function drawBottomAlignedText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  bottom: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxLines: number,
-  align: CanvasTextAlign,
-) {
-  const lines = wrapLines(ctx, text, maxWidth, maxLines);
-  let y = bottom - lines.length * lineHeight;
-  ctx.textAlign = align;
-  for (const line of lines) {
-    ctx.fillText(line, x, y);
-    y += lineHeight;
-  }
-}
-
-function wrapLines(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  maxLines: number,
-) {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let line = '';
-
-  for (const word of words) {
-    const testLine = line ? `${line} ${word}` : word;
-    if (ctx.measureText(testLine).width > maxWidth && line) {
-      lines.push(line);
-      line = word;
-      if (lines.length >= maxLines - 1) break;
-    } else {
-      line = testLine;
-    }
-  }
-
-  if (line && lines.length < maxLines) lines.push(line);
-  return lines;
 }
