@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spleeve Privacy Policy</title>
+    <meta name="description" content="Spleeve privacy policy for App Store review and users.">
+    <link rel="icon" href="/favicon.svg">
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f6f4;
+        --fg: #202321;
+        --muted: #5d625f;
+        --line: rgba(32, 35, 33, 0.14);
+        --accent: #159a5f;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111311;
+          --fg: #f2f0ea;
+          --muted: #a9aea9;
+          --line: rgba(242, 240, 234, 0.16);
+          --accent: #50d38d;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 28rem),
+          var(--bg);
+        color: var(--fg);
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.65;
+      }
+
+      header,
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding-left: 22px;
+        padding-right: 22px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding-top: 22px;
+        padding-bottom: 22px;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .brand {
+        color: var(--fg);
+        font-weight: 760;
+        letter-spacing: -0.02em;
+      }
+
+      .back {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      main {
+        padding-top: clamp(38px, 8vw, 78px);
+        padding-bottom: 90px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2.5rem, 8vw, 5rem);
+        line-height: 0.94;
+        letter-spacing: -0.06em;
+      }
+
+      h2 {
+        border-top: 1px solid var(--line);
+        margin: 34px 0 10px;
+        padding-top: 26px;
+        font-size: 1.08rem;
+        letter-spacing: -0.02em;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        font-size: 1.02rem;
+      }
+
+      .updated {
+        margin: 0 0 28px;
+        color: var(--muted);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/">Spleeve</a>
+      <a class="back" href="/">Back to app</a>
+    </header>
+
+    <main>
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: June 25, 2026</p>
+
+      <p>Spleeve prepares local audio files for Spotify local files by editing metadata, artwork, trims, loudness, and exports.</p>
+
+      <h2>Data collection</h2>
+      <p>Spleeve does not collect analytics, diagnostics, advertising identifiers, or usage data from the iOS app. Spleeve does not sell personal information.</p>
+
+      <h2>Files and on-device processing</h2>
+      <p>Audio files and artwork selected in Spleeve are processed on your device. Spleeve does not upload those files to a developer server. If you export or share a file, that action is handled by iOS and the destination you choose.</p>
+
+      <h2>Photos access</h2>
+      <p>Spleeve can use the iOS photo picker when you choose cover artwork from your photo library. Spleeve can also ask for permission to save exported cover artwork to your photo library. Photo access is used only for the action you choose.</p>
+
+      <h2>Apple Music search</h2>
+      <p>Spleeve can search Apple Music to find album artwork and missing metadata. When you use that feature, the search text is sent to Apple Music and Apple returns matching artwork and metadata. Spleeve uses those results to help fill the track fields you choose.</p>
+
+      <h2>Third parties</h2>
+      <p>Spleeve does not include advertising SDKs, analytics SDKs, or third-party tracking tools in the iOS app. Apple services may be used for photo library actions and Apple Music artwork search.</p>
+
+      <h2>Contact</h2>
+      <p>For privacy questions, contact <a href="mailto:daniticau@gmail.com">daniticau@gmail.com</a>.</p>
+    </main>
+  </body>
+</html>
